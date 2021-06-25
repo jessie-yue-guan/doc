@@ -129,6 +129,11 @@ See the [NAIS manifest](../../nais-application/application.md#azureapplication).
             - application: app-a
               namespace: othernamespace
               cluster: dev-fss
+              permissions:
+                roles:
+                  - "custom-role"
+                scopes:
+                  - "custom-scope"
             - application: app-b
 
       # required for on-premises only
@@ -229,7 +234,9 @@ spec:
       tenant: trygdeetaten.no 
 ```
 
-### Pre-authorization
+### Access Policy
+
+#### Pre-authorization
 
 For proper scoping of tokens when performing calls between clients, one must either:
 
@@ -268,6 +275,86 @@ The above configuration will pre-authorize the Azure AD clients belonging to:
 * application `app-a` running in the **same namespace** and **same cluster** as your application 
 * application `app-b` running in the namespace `other-namespace` in the **same cluster**
 * application `app-c` running in the namespace `other-namespace` in the cluster `other-cluster`
+
+The default permissions will grant consumer clients the role `access_as_application`, which will only appear in tokens acquired with the client credentials flow (i.e. service-to-service requests).
+
+If you require more fine-grained access control, see [Fine-Grained Access Control](#fine-grained-access-control).
+
+### Fine-Grained Access Control 
+
+You may define custom permissions for your client in Azure AD. These can be granted to consumer clients individually as an
+extension of the [access policy](#access-policy) definitions described above.
+
+When granted to a consumer, the permissions will appear in their respective claims in tokens targeted to your application. 
+Your application can then use these claims to implement custom authorization logic.
+
+!!! warning
+    Custom permissions only apply in the context of _your own application_ as an API provider. 
+    **They are _not_ global permissions.**
+    
+    They will only appear in tokens when all the following conditions are met:
+    
+    1. The token is acquired by a consumer of your application.
+    2. The consumer has been granted a custom permission your access policy definition.
+    3. The target _audience_ is your application.
+
+#### Custom Scopes
+
+A _scope_ only applies to tokens acquired using the 
+[OAuth 2.0 On-Behalf-Of flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-on-behalf-of-flow) 
+(service-to-service calls on behalf of an end-user).
+
+Example configuration:
+
+```yaml
+spec:
+  accessPolicy:
+    inbound:
+      rules:
+        - application: app-a
+          namespace: other-namespace
+          cluster: other-cluster
+          permissions:
+            scopes:
+              - "custom-scope"
+```
+
+The above configuration grants the application `app-a` the scope `custom-scope`.
+
+Example decoded token (on-behalf-of flow):
+
+```json
+# TODO
+```
+
+#### Custom Roles
+
+A _role_ only applies to tokens acquired using the
+using the [OAuth 2.0 client credentials flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow) 
+(service-to-service calls).
+
+Example configuration:
+
+```yaml
+spec:
+  accessPolicy:
+    inbound:
+      rules:
+        - application: app-a
+          namespace: other-namespace
+          cluster: other-cluster
+          permissions:
+            roles:
+              - "custom-role"
+```
+
+The above configuration grants the application `app-a` the role `custom-role`.
+
+Example decoded token (client credentials flow):
+
+```json
+# TODO
+```
 
 ### Groups
 
@@ -529,7 +616,7 @@ Communication between legacy clients provisioned through [aad-iac](https://githu
     Steps:
 
     * The legacy client **must** follow the expected [naming format](azure-ad.md#naming-format). Follow step 1 and step 2 in the [migration guide](azure-ad.md#migration-guide-step-by-step).
-    * Refer to the legacy client [analogously to a NAIS application](azure-ad.md#pre-authorization_1)
+    * Refer to the legacy client [analogously to a NAIS application](azure-ad.md#pre-authorization)
     
     Example:
     
